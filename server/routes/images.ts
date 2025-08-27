@@ -4,6 +4,8 @@ import fetch from 'node-fetch';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import * as net from 'net';
+import * as dns from 'dns/promises';
 
 export const imagesRouter = Router();
 
@@ -188,6 +190,24 @@ async function handleUrlImage(url: string, fileHash: string, res: Response) {
     
     // If the URL doesn't start with http/https, add it
     const fullUrl = url.startsWith('http') ? url : `https://${url}`;
+
+    // Basic SSRF protections
+    if (isDisallowedTarget(fullUrl)) {
+      console.error(`Blocked disallowed image target: ${fullUrl}`);
+      return res.redirect('/api/images/placeholder');
+    }
+
+    // DNS resolution to block private/localhost resolutions
+    try {
+      const target = new URL(fullUrl);
+      const { address } = await dns.lookup(target.hostname);
+      if (isPrivateAddress(address)) {
+        console.error(`Blocked private address resolution for ${fullUrl} -> ${address}`);
+        return res.redirect('/api/images/placeholder');
+      }
+    } catch (_dnsErr) {
+      // If DNS lookup fails, continue and let fetch handle errors
+    }
     
     // First check for rate-limited placeholder
     // This helps us avoid repeatedly hitting rate-limited services (especially Imgur)
@@ -333,6 +353,61 @@ async function handleUrlImage(url: string, fileHash: string, res: Response) {
     console.error('Error handling URL image:', error);
     return res.redirect('/api/images/placeholder');
   }
+}
+
+function isDisallowedTarget(urlString: string): boolean {
+  try {
+    const u = new URL(urlString);
+    // Only allow http/https
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return true;
+
+    // Disallow credentials in URL
+    if (u.username || u.password) return true;
+
+    const host = u.hostname.toLowerCase();
+    // Block localhost and common internal domains
+    if (
+      host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' ||
+      host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.lan')
+    ) {
+      return true;
+    }
+
+    // Block direct IPs in private ranges
+    if (net.isIP(host)) {
+      return isPrivateAddress(host);
+    }
+
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+function isPrivateAddress(ip: string): boolean {
+  // IPv6 loopback
+  if (ip === '::1') return true;
+
+  // IPv4 checks
+  if (net.isIP(ip) === 4) {
+    const parts = ip.split('.').map(Number);
+    const [a, b] = parts;
+    if (a === 10) return true; // 10.0.0.0/8
+    if (a === 127) return true; // 127.0.0.0/8
+    if (a === 0) return true; // 0.0.0.0/8
+    if (a === 169 && b === 254) return true; // 169.254.0.0/16 (link-local)
+    if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+    if (a === 192 && b === 168) return true; // 192.168.0.0/16
+  }
+
+  // IPv6 ULA fc00::/7 and link-local fe80::/10
+  if (net.isIP(ip) === 6) {
+    const lower = ip.toLowerCase();
+    if (lower.startsWith('fc') || lower.startsWith('fd')) return true; // fc00::/7
+    if (lower.startsWith('fe80')) return true; // fe80::/10
+  }
+
+  return false;
 }
 
 /**
