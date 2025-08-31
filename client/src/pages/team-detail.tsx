@@ -15,14 +15,14 @@ export default function TeamMemberDetail() {
   const [, setLocation] = useLocation();
 
   const { data: teamMember, isLoading: teamLoading, error: teamError } = useQuery({
-    queryKey: [API_ROUTES.TEAM_MEMBER_BY_ID(id)],
-    queryFn: () => fetchTeamMemberById(id),
+    queryKey: [API_ROUTES.TEAM_MEMBER_BY_ID(id!)],
+    queryFn: () => fetchTeamMemberById(id!),
     enabled: !!id,
   });
 
   const { data: articles, isLoading: articlesLoading } = useQuery({
     queryKey: [`/api/team/${id}/articles`],
-    queryFn: () => fetchArticlesByTeamMemberId(id),
+    queryFn: () => fetchArticlesByTeamMemberId(id!),
     enabled: !!teamMember && !!id,
   });
 

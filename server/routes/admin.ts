@@ -136,7 +136,8 @@ router.post('/articles/submit', requireAdminAuth, async (req, res) => {
       title,
       content,
       excerpt: excerpt || content.substring(0, 150) + '...',
-      author,
+      // Article type uses 'name' for author
+      name: author,
       imageUrl: imageUrl || '',
       featured,
       publishedAt: new Date(),
