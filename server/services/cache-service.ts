@@ -1,4 +1,5 @@
 import { Article, Team, CarouselQuote } from "@shared/schema";
+import { PublicationScheduler } from "./publication-scheduler";
 import fs from 'fs';
 import path from 'path';
 
@@ -23,11 +24,25 @@ if (!fs.existsSync(LOCK_DIR)) {
   console.log(`Created lock directory at ${LOCK_DIR}`);
 }
 
-// Cache expiration times (in milliseconds)
-const CACHE_EXPIRY = {
-  ARTICLES: 30 * 60 * 1000, // 30 minutes
-  TEAM: 60 * 60 * 1000,     // 1 hour
-  QUOTES: 60 * 60 * 1000,   // 1 hour
+/**
+ * Get publication-aware cache expiry times
+ * Using PublicationScheduler to align with refresh intervals
+ */
+const getCacheExpiry = (contentType: 'articles' | 'team' | 'quotes') => {
+  switch (contentType) {
+    case 'articles':
+      // Articles are critical/important content 
+      return PublicationScheduler.getCacheExpiry('important');
+    case 'team':
+      // Team is stable content
+      return PublicationScheduler.getCacheExpiry('stable');
+    case 'quotes':
+      // Quotes are stable content  
+      return PublicationScheduler.getCacheExpiry('stable');
+    default:
+      // Default to stable content tier
+      return PublicationScheduler.getCacheExpiry('stable');
+  }
 };
 
 // Lock timeout (in milliseconds)
@@ -52,8 +67,8 @@ export class CacheService {
       const cacheContent = fs.readFileSync(ARTICLES_CACHE_FILE, 'utf-8');
       const cache = JSON.parse(cacheContent) as CacheData<{ articles: Article[], total: number }>;
       
-      // Check if cache is expired
-      if (Date.now() - cache.timestamp > CACHE_EXPIRY.ARTICLES) {
+      // Check if cache is expired using publication-aware expiry times
+      if (Date.now() - cache.timestamp > getCacheExpiry('articles')) {
         console.log('Articles cache expired, returning null');
         return null;
       }
@@ -99,8 +114,8 @@ export class CacheService {
       const cacheContent = fs.readFileSync(FEATURED_ARTICLES_CACHE_FILE, 'utf-8');
       const cache = JSON.parse(cacheContent) as CacheData<Article[]>;
       
-      // Check if cache is expired
-      if (Date.now() - cache.timestamp > CACHE_EXPIRY.ARTICLES) {
+      // Check if cache is expired using publication-aware expiry times
+      if (Date.now() - cache.timestamp > getCacheExpiry('articles')) {
         console.log('Featured articles cache expired, returning null');
         return null;
       }
@@ -140,8 +155,8 @@ export class CacheService {
       const cacheContent = fs.readFileSync(RECENT_ARTICLES_CACHE_FILE, 'utf-8');
       const cache = JSON.parse(cacheContent) as CacheData<Article[]>;
       
-      // Check if cache is expired
-      if (Date.now() - cache.timestamp > CACHE_EXPIRY.ARTICLES) {
+      // Check if cache is expired using publication-aware expiry times
+      if (Date.now() - cache.timestamp > getCacheExpiry('articles')) {
         console.log('Recent articles cache expired, returning null');
         return null;
       }
@@ -181,8 +196,8 @@ export class CacheService {
       const cacheContent = fs.readFileSync(TEAM_CACHE_FILE, 'utf-8');
       const cache = JSON.parse(cacheContent) as CacheData<Team[]>;
       
-      // Check if cache is expired
-      if (Date.now() - cache.timestamp > CACHE_EXPIRY.TEAM) {
+      // Check if cache is expired using publication-aware expiry times
+      if (Date.now() - cache.timestamp > getCacheExpiry('team')) {
         console.log('Team members cache expired, returning null');
         return null;
       }
@@ -222,8 +237,8 @@ export class CacheService {
       const cacheContent = fs.readFileSync(QUOTES_CACHE_FILE, 'utf-8');
       const cache = JSON.parse(cacheContent) as CacheData<CarouselQuote[]>;
       
-      // Check if cache is expired
-      if (Date.now() - cache.timestamp > CACHE_EXPIRY.QUOTES) {
+      // Check if cache is expired using publication-aware expiry times
+      if (Date.now() - cache.timestamp > getCacheExpiry('quotes')) {
         console.log('Quotes cache expired, returning null');
         return null;
       }

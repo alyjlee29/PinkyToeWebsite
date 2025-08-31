@@ -85,7 +85,16 @@ app.use((req, res, next) => {
       }
 
       // Start background refresh service once server is running
-      RefreshService.startRefreshSchedules();
+      console.log('Starting publication-aware cache system...');
+      
+      // Warm up cache first for immediate availability
+      RefreshService.warmupCache().then(() => {
+        console.log('Cache warmup completed, starting refresh schedules...');
+        RefreshService.startRefreshSchedules();
+      }).catch((error) => {
+        console.error('Cache warmup failed, starting refresh schedules anyway:', error);
+        RefreshService.startRefreshSchedules();
+      });
 
       // Setup graceful shutdown
       const shutdown = () => {

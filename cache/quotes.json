@@ -3,33 +3,28 @@
     {
       "id": 1,
       "carousel": "main",
-      "quote": "You should be locking in... "
+      "quote": "Feminism: the radical notion that women are people too!"
+    },
+    {
+      "id": 2,
+      "carousel": "main",
+      "quote": "In a world full of sharks, be a pinky toe - small but mighty enough to make someone curse when they least expect it."
     },
     {
       "id": 3,
       "carousel": "main",
-      "quote": "Brown Paper Bag x Baggu"
-    },
-    {
-      "id": 5,
-      "carousel": "main",
-      "quote": "Latina Mode off"
-    },
-    {
-      "id": 2,
-      "carousel": "philo",
-      "quote": "Time Discovered To Be Revolutionary Treatment That Heal All Wounds"
+      "quote": "Life is too short for boring shoes and men who don't get feminist jokes."
     },
     {
       "id": 4,
-      "carousel": "philo",
-      "quote": "Down to do hard drugs, on the fence about hinge"
+      "carousel": "Philo",
+      "quote": "The pinky toe may be small, but it shoulders an unfair share of furniture encounters."
     },
     {
-      "id": 6,
-      "carousel": "philo",
-      "quote": "Moo Deng dies in Southeast Asia earthquake. It's true!"
+      "id": 5,
+      "carousel": "Philo",
+      "quote": "A pinky toe's strength isn't measured by its size, but by how loudly it makes you yell when it hits the coffee table."
     }
   ],
-  "timestamp": 1754131850766
+  "timestamp": 1756374002755
 }

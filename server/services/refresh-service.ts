@@ -1,5 +1,6 @@
 import { storage } from "../storage";
 import { CacheService } from "./cache-service";
+import { PublicationScheduler } from "./publication-scheduler";
 import { ImageService } from "./image-service";
 import { Article, Team } from "@shared/schema";
 import fetch from "node-fetch";
@@ -13,21 +14,12 @@ if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
-// Define refresh intervals (in milliseconds)
-const REFRESH_INTERVALS = {
-  ARTICLES: 120 * 60 * 1000,         // 120 minutes (2 hours)
-  FEATURED_ARTICLES: 90 * 60 * 1000,  // 90 minutes (1.5 hours)
-  RECENT_ARTICLES: 60 * 60 * 1000,    // 60 minutes (1 hour)
-  TEAM: 180 * 60 * 1000,              // 180 minutes (3 hours)
-  QUOTES: 180 * 60 * 1000             // 180 minutes (3 hours)
-};
-
 // Track timers for cleanup
 let refreshTimers: NodeJS.Timeout[] = [];
 
 /**
- * Refresh service handles background data refresh
- * It periodically fetches fresh data from Airtable and updates the cache
+ * Publication-aware refresh service
+ * Handles background data refresh with business hours awareness and content priority tiers
  */
 export class RefreshService {
   // Track when the last refresh was triggered to prevent too many refreshes in a short period
@@ -41,28 +33,91 @@ export class RefreshService {
   };
 
   // Minimum time between refreshes (in milliseconds) to prevent overloading Airtable API
-  private static readonly MIN_REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes
+  private static readonly MIN_REFRESH_INTERVAL = 15 * 60 * 1000; // 15 minutes (reduced for better publication responsiveness)
   
   /**
-   * Start all refresh schedules
+   * Start all refresh schedules with publication-aware timing
    */
   static startRefreshSchedules(): void {
-    console.log('Starting background data refresh schedules...');
+    console.log('Starting publication-aware data refresh schedules...');
+    
+    // Log current scheduling context
+    PublicationScheduler.logSchedulingContext();
     
     // Initial refresh of all data
     this.refreshAll();
     
-    // Schedule periodic refreshes
-    const articlesTimer = setInterval(() => this.refreshArticles(), REFRESH_INTERVALS.ARTICLES);
-    const featuredArticlesTimer = setInterval(() => this.refreshFeaturedArticles(), REFRESH_INTERVALS.FEATURED_ARTICLES);
-    const recentArticlesTimer = setInterval(() => this.refreshRecentArticles(), REFRESH_INTERVALS.RECENT_ARTICLES);
-    const teamTimer = setInterval(() => this.refreshTeam(), REFRESH_INTERVALS.TEAM);
-    const quotesTimer = setInterval(() => this.refreshQuotes(), REFRESH_INTERVALS.QUOTES);
+    // Start dynamic scheduling that adapts to business hours
+    this.startDynamicScheduling();
     
-    // Store timers for cleanup
-    refreshTimers = [articlesTimer, featuredArticlesTimer, recentArticlesTimer, teamTimer, quotesTimer];
+    console.log('Publication-aware refresh schedules started successfully');
+  }
+
+  /**
+   * Start dynamic scheduling that adapts to business hours
+   */
+  private static startDynamicScheduling(): void {
+    // Schedule refreshes based on current business hours status
+    this.scheduleNextRefreshCycle();
     
-    console.log('Background refresh schedules started successfully');
+    // Set up a timer to transition between business/off-hours scheduling
+    // Check every 15 minutes if we need to adjust intervals
+    const scheduleMonitor = setInterval(() => {
+      this.checkAndUpdateScheduling();
+    }, 15 * 60 * 1000); // 15 minutes
+    
+    refreshTimers.push(scheduleMonitor);
+  }
+
+  /**
+   * Schedule the next refresh cycle based on current time
+   */
+  private static scheduleNextRefreshCycle(): void {
+    // Clear existing timers first
+    this.clearContentRefreshTimers();
+    
+    // Get current intervals based on business hours
+    const recentArticlesInterval = PublicationScheduler.getRefreshInterval('critical'); // Recent articles are critical
+    const featuredArticlesInterval = PublicationScheduler.getRefreshInterval('important'); // Featured articles are important  
+    const articlesInterval = PublicationScheduler.getRefreshInterval('important'); // All articles are important
+    const teamInterval = PublicationScheduler.getRefreshInterval('stable'); // Team is stable
+    const quotesInterval = PublicationScheduler.getRefreshInterval('stable'); // Quotes are stable
+    
+    console.log(`Scheduling refreshes - Business hours: ${PublicationScheduler.isBusinessHours()}`);
+    console.log(`  Recent articles: ${Math.round(recentArticlesInterval / (60 * 1000))} minutes`);
+    console.log(`  Featured articles: ${Math.round(featuredArticlesInterval / (60 * 1000))} minutes`);
+    console.log(`  Articles: ${Math.round(articlesInterval / (60 * 1000))} minutes`);
+    console.log(`  Team: ${Math.round(teamInterval / (60 * 1000))} minutes`);
+    console.log(`  Quotes: ${Math.round(quotesInterval / (60 * 1000))} minutes`);
+    
+    // Schedule periodic refreshes with current intervals
+    const recentArticlesTimer = setInterval(() => this.refreshRecentArticles(), recentArticlesInterval);
+    const featuredArticlesTimer = setInterval(() => this.refreshFeaturedArticles(), featuredArticlesInterval);
+    const articlesTimer = setInterval(() => this.refreshArticles(), articlesInterval);
+    const teamTimer = setInterval(() => this.refreshTeam(), teamInterval);
+    const quotesTimer = setInterval(() => this.refreshQuotes(), quotesInterval);
+    
+    // Store timers for cleanup (separate from monitor timer)
+    this.contentRefreshTimers = [recentArticlesTimer, featuredArticlesTimer, articlesTimer, teamTimer, quotesTimer];
+  }
+
+  /**
+   * Clear content refresh timers (but not the monitor timer)
+   */
+  private static contentRefreshTimers: NodeJS.Timeout[] = [];
+  
+  private static clearContentRefreshTimers(): void {
+    this.contentRefreshTimers.forEach(timer => clearInterval(timer));
+    this.contentRefreshTimers = [];
+  }
+
+  /**
+   * Check if we need to update scheduling (e.g., transition from business to off-hours)
+   */
+  private static checkAndUpdateScheduling(): void {
+    // Always reschedule to ensure we're using current business hours status
+    console.log('Checking and updating refresh scheduling...');
+    this.scheduleNextRefreshCycle();
   }
   
   /**
@@ -107,10 +162,65 @@ export class RefreshService {
    * Stop all refresh schedules
    */
   static stopRefreshSchedules(): void {
-    console.log('Stopping background data refresh schedules...');
+    console.log('Stopping publication-aware refresh schedules...');
     refreshTimers.forEach(timer => clearInterval(timer));
     refreshTimers = [];
-    console.log('Background refresh schedules stopped');
+    this.clearContentRefreshTimers();
+    console.log('Publication-aware refresh schedules stopped');
+  }
+
+  /**
+   * Emergency refresh for breaking news or urgent updates
+   * Immediately refreshes critical content regardless of throttling
+   */
+  static async emergencyRefresh(): Promise<void> {
+    console.log('🚨 EMERGENCY REFRESH TRIGGERED - Bypassing normal throttling');
+    
+    try {
+      // Reset throttling timestamps for critical content
+      const now = Date.now();
+      this.lastRefreshTime.recentArticles = 0;
+      this.lastRefreshTime.featuredArticles = 0;
+      
+      // Refresh critical content immediately
+      await Promise.all([
+        this.refreshRecentArticles(),
+        this.refreshFeaturedArticles()
+      ]);
+      
+      console.log('🚨 Emergency refresh completed successfully');
+    } catch (error) {
+      console.error('🚨 Emergency refresh failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Warm up all caches on server start
+   * Ensures fresh data is available immediately
+   */
+  static async warmupCache(): Promise<void> {
+    console.log('🔥 Cache warmup started...');
+    
+    try {
+      // Refresh all content in priority order
+      await this.refreshRecentArticles(); // Critical first
+      await this.refreshFeaturedArticles(); // Important second
+      await this.refreshArticles(); // Important third
+      
+      // Stable content can load in background
+      Promise.all([
+        this.refreshTeam(),
+        this.refreshQuotes()
+      ]).catch(error => {
+        console.error('Background warmup error (non-critical):', error);
+      });
+      
+      console.log('🔥 Cache warmup completed (critical content ready)');
+    } catch (error) {
+      console.error('🔥 Cache warmup failed:', error);
+      // Don't throw - server should still start even if warmup fails
+    }
   }
   
   /**

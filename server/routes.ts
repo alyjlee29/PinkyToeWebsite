@@ -3,11 +3,76 @@ import { createServer, type Server } from "http";
 import { cachedStorage } from "./index";
 import { imagesRouter } from "./routes/images";
 import { adminRouter } from "./routes/admin";
+import { RefreshService } from "./services/refresh-service";
+import { PublicationScheduler } from "./services/publication-scheduler";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register the routers
   app.use('/api/images', imagesRouter);
   app.use('/api/admin', adminRouter);
+
+  // Publication cache management endpoints
+  app.post("/api/cache/emergency-refresh", async (req, res) => {
+    try {
+      console.log('Emergency refresh requested via API');
+      await RefreshService.emergencyRefresh();
+      res.json({ 
+        message: "Emergency refresh completed successfully",
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Emergency refresh failed:", error);
+      res.status(500).json({ 
+        message: "Emergency refresh failed", 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.get("/api/cache/status", async (req, res) => {
+    try {
+      const isBusinessHours = PublicationScheduler.isBusinessHours();
+      const criticalInterval = PublicationScheduler.getRefreshInterval('critical');
+      const importantInterval = PublicationScheduler.getRefreshInterval('important');
+      const stableInterval = PublicationScheduler.getRefreshInterval('stable');
+      
+      res.json({
+        isBusinessHours,
+        refreshIntervals: {
+          critical: {
+            minutes: Math.round(criticalInterval / (60 * 1000)),
+            milliseconds: criticalInterval
+          },
+          important: {
+            minutes: Math.round(importantInterval / (60 * 1000)),
+            milliseconds: importantInterval
+          },
+          stable: {
+            minutes: Math.round(stableInterval / (60 * 1000)),
+            milliseconds: stableInterval
+          }
+        },
+        cacheExpiry: {
+          critical: {
+            minutes: Math.round(PublicationScheduler.getCacheExpiry('critical') / (60 * 1000)),
+            milliseconds: PublicationScheduler.getCacheExpiry('critical')
+          },
+          important: {
+            minutes: Math.round(PublicationScheduler.getCacheExpiry('important') / (60 * 1000)),
+            milliseconds: PublicationScheduler.getCacheExpiry('important')
+          },
+          stable: {
+            minutes: Math.round(PublicationScheduler.getCacheExpiry('stable') / (60 * 1000)),
+            milliseconds: PublicationScheduler.getCacheExpiry('stable')
+          }
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error getting cache status:", error);
+      res.status(500).json({ message: "Failed to get cache status" });
+    }
+  });
   // API routes for articles
   app.get("/api/articles", async (req, res) => {
     try {
