@@ -1,32 +1,32 @@
 {
   "data": [
     {
-      "id": "rec1",
+      "id": "sample1",
       "name": "Sarah Johnson",
       "role": "Editor-in-Chief",
       "bio": "Comedy writer and feminist scholar with a passion for empowering women through humor.",
-      "imageUrl": "/api/images/https%3A%2F%2Fimages.unsplash.com%2Fphoto-1494790108377-be9c29b29330%3Fixlib%3Drb-1.2.1%26auto%3Dformat%26fit%3Dcrop%26w%3D800%26q%3D80",
+      "imageUrl": "/api/images/placeholder",
       "imageType": "url",
       "imagePath": null
     },
     {
-      "id": "rec2",
+      "id": "sample2",
       "name": "Emily Rodriguez",
       "role": "Lead Writer",
       "bio": "Comedian and essayist focusing on intersectional feminism and representation in media.",
-      "imageUrl": "/api/images/https%3A%2F%2Fimages.unsplash.com%2Fphoto-1508214751196-bcfd4ca60f91%3Fixlib%3Drb-1.2.1%26auto%3Dformat%26fit%3Dcrop%26w%3D800%26q%3D80",
+      "imageUrl": "/api/images/placeholder",
       "imageType": "url",
       "imagePath": null
     },
     {
-      "id": "rec3",
+      "id": "sample3",
       "name": "Jessica Lee",
       "role": "Staff Writer",
       "bio": "Cultural critic and humor writer exploring gender politics through a satirical lens.",
-      "imageUrl": "/api/images/https%3A%2F%2Fimages.unsplash.com%2Fphoto-1581992652564-44c42f5ad3ad%3Fixlib%3Drb-1.2.1%26auto%3Dformat%26fit%3Dcrop%26w%3D800%26q%3D80",
+      "imageUrl": "/api/images/placeholder",
       "imageType": "url",
       "imagePath": null
     }
   ],
-  "timestamp": 1756374002755
+  "timestamp": 1754417766522
 }

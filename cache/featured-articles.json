@@ -1,40 +1,4 @@
 {
-  "data": [
-    {
-      "id": "article1",
-      "title": "The Evolution of Feminist Comedy",
-      "description": "How humor has been a powerful tool for feminist movements throughout history, breaking barriers and challenging stereotypes.",
-      "excerpt": "A look at feminist comedy through the decades.",
-      "content": "Throughout history, women have used humor as a powerful tool to challenge patriarchal structures, break barriers, and advocate for equality. From the witty satires of Jane Austen to the groundbreaking stand-up of contemporary comedians, feminist humor has evolved significantly while maintaining its core purpose: to critique, challenge, and change the status quo.\n\nThe Early Pioneers\n\nIn the 19th century, writers like Jane Austen and Frances Burney used wit and irony to subtly critique society's expectations of women. While not overtly labeled as \"feminist\" in their time, their sharp observations of social hierarchies and marriage markets laid the groundwork for feminist humor that would follow.\n\nThe suffragette movement also employed humor effectively, using satirical cartoons and witty slogans to counter anti-suffrage arguments and humanize their cause. These early pioneers understood that laughter could be a disarming entry point for radical ideas.",
-      "contentFormat": "plaintext",
-      "imageUrl": "/api/images/https%3A%2F%2Fimages.unsplash.com%2Fphoto-1533562669260-350775484a52%3Fixlib%3Drb-1.2.1%26auto%3Dformat%26fit%3Dcrop%26w%3D800%26q%3D80",
-      "imageType": "url",
-      "imagePath": null,
-      "featured": true,
-      "publishedAt": "2023-08-24T00:00:00.000Z",
-      "name": "Sarah Johnson",
-      "photo": "/api/images/https%3A%2F%2Fimages.unsplash.com%2Fphoto-1533562669260-350775484a52%3Fixlib%3Drb-1.2.1%26auto%3Dformat%26fit%3Dcrop%26w%3D800%26q%3D80",
-      "name_photo": "Photo by John Smith",
-      "status": "published",
-      "createdAt": "2023-08-20T00:00:00.000Z"
-    },
-    {
-      "id": "article2",
-      "title": "Finding Your Voice: Women in Comedy",
-      "description": "Interviews with rising female comedians who are reshaping the landscape of humor and representation.",
-      "content": "Full article content here...",
-      "contentFormat": "plaintext",
-      "imageUrl": "/api/images/https%3A%2F%2Fimages.unsplash.com%2Fphoto-1507676184212-d03ab07a01bf%3Fixlib%3Drb-1.2.1%26auto%3Dformat%26fit%3Dcrop%26w%3D800%26q%3D80",
-      "imageType": "url",
-      "imagePath": null,
-      "featured": true,
-      "publishedAt": "2023-07-15T00:00:00.000Z",
-      "name": "Emily Rodriguez",
-      "photo": "/api/images/https%3A%2F%2Fimages.unsplash.com%2Fphoto-1507676184212-d03ab07a01bf%3Fixlib%3Drb-1.2.1%26auto%3Dformat%26fit%3Dcrop%26w%3D800%26q%3D80",
-      "name_photo": "Photo by Jane Doe",
-      "status": "published",
-      "createdAt": "2023-07-10T00:00:00.000Z"
-    }
-  ],
-  "timestamp": 1756374034189
+  "data": [],
+  "timestamp": 1754417765113
 }
