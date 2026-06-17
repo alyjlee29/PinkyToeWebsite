@@ -28,6 +28,16 @@ export class AirtableStorage implements IStorage {
   private base: Airtable.Base;
   private quotes: CarouselQuote[] = [];
   private quoteLastFetched: Date | null = null;
+  private readonly teamTableCandidates = [
+    'Teams',
+    'Team',
+    'Team Members',
+    'Members',
+    'Club Members',
+    'Member Directory',
+    'Roster',
+    'Piscoc Members'
+  ];
 
   constructor() {
     Airtable.configure({
@@ -193,57 +203,72 @@ export class AirtableStorage implements IStorage {
   }
 
   async getTeamMembers(): Promise<Team[]> {
-    try {
-      // Check if the table exists first by trying to access it
-      const query = this.base('Teams').select({
-        sort: [{ field: 'Name', direction: 'asc' }]
-      });
+    const attemptedTables: string[] = [];
 
-      const records = await query.all();
-      return records.map(this.mapAirtableRecordToTeamMember);
-    } catch (error: any) {
-      // Log detailed error information
-      console.error('Error fetching team members from Airtable:', error);
+    for (const tableName of this.getTeamTableCandidates()) {
+      try {
+        attemptedTables.push(tableName);
 
-      // If we have authorization issues, log a more specific message
-      if (error.statusCode === 403) {
-        console.warn('Authorization issue detected with Airtable Teams table. Check API key permissions.');
-        console.log('Falling back to sample team members data');
-        // Return sample team members when there's an authorization error
-        return this.getSampleTeamMembers();
-      } else if (error.statusCode === 404) {
-        console.warn('Teams table not found in Airtable base. Check table name and base configuration.');
-        console.log('Falling back to sample team members data');
-        // Return sample team members when the table doesn't exist
-        return this.getSampleTeamMembers();
+        const query = this.base(tableName).select();
+        const records = await query.all();
+
+        if (!records || records.length === 0) {
+          console.warn(`Airtable table "${tableName}" returned no team member records. Trying next candidate if available.`);
+          continue;
+        }
+
+        const team = records
+          .map(record => this.mapAirtableRecordToTeamMember(record))
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        console.log(`Fetched ${team.length} team members from Airtable table "${tableName}".`);
+        return team;
+      } catch (error: any) {
+        if (this.isPermissionError(error)) {
+          console.warn(`Authorization issue detected with Airtable table "${tableName}". Falling back to sample data.`);
+          return this.getSampleTeamMembers();
+        }
+
+        if (this.isMissingTableError(error)) {
+          console.warn(`Airtable table "${tableName}" not found. Trying next candidate if available.`);
+          continue;
+        }
+
+        console.error(`Error fetching team members from Airtable table "${tableName}":`, error);
       }
-
-      // Return empty array for other errors
-      return [];
     }
+
+    if (attemptedTables.length > 0) {
+      console.error(`Unable to fetch team members from Airtable. Tables attempted: ${attemptedTables.join(', ')}.`);
+    }
+
+    return [];
   }
 
   async getTeamMemberById(id: string): Promise<Team | undefined> {
-    try {
-      const record = await this.base('Teams').find(id);
-      return this.mapAirtableRecordToTeamMember(record);
-    } catch (error: any) {
-      console.error(`Error fetching team member ${id} from Airtable:`, error);
+    for (const tableName of this.getTeamTableCandidates()) {
+      try {
+        const record = await this.base(tableName).find(id);
+        if (record) {
+          return this.mapAirtableRecordToTeamMember(record);
+        }
+      } catch (error: any) {
+        if (this.isPermissionError(error)) {
+          console.warn(`Authorization issue detected with Airtable table "${tableName}" for ID ${id}. Falling back to sample data.`);
+          const sampleTeamMembers = this.getSampleTeamMembers();
+          return sampleTeamMembers.find(member => member.id === id) || sampleTeamMembers[0];
+        }
 
-      // If we have authorization issues, log a more specific message
-      if (error.statusCode === 403) {
-        console.warn(`Authorization issue detected with Airtable Teams table for ID ${id}. Check API key permissions.`);
-        console.log('Falling back to sample team members data');
-        // Return a sample team member when there's an authorization error
-        const sampleTeamMembers = this.getSampleTeamMembers();
-        // Try to find a sample member with the matching ID, or return the first one if not found
-        return sampleTeamMembers.find(member => member.id === id) || sampleTeamMembers[0];
-      } else if (error.statusCode === 404) {
-        console.warn(`Team member with ID ${id} not found in Airtable or Teams table does not exist.`);
+        if (this.isMissingTableError(error) || this.isRecordNotFoundError(error)) {
+          console.warn(`Team member with ID ${id} not found in Airtable table "${tableName}". Trying next candidate.`);
+          continue;
+        }
+
+        console.error(`Error fetching team member ${id} from Airtable table "${tableName}":`, error);
       }
-
-      return undefined;
     }
+
+    return undefined;
   }
 
   async getQuotes(): Promise<CarouselQuote[]> {
@@ -487,43 +512,44 @@ export class AirtableStorage implements IStorage {
   }
 
   private mapAirtableRecordToTeamMember(record: Airtable.Record<any>): Team {
+    const imageUrl = this.extractTeamImageUrl(record);
 
+    const name = this.extractStringField(record, [
+      'Name',
+      'name',
+      'Full Name',
+      'Full name',
+      'Display Name',
+      'Preferred Name',
+      'Member Name'
+    ]) || record.id;
 
-    // Use MainImageLink as the primary source for image URLs
-    let imageUrl = '';
+    const role = this.extractStringField(record, [
+      'Role',
+      'role',
+      'Position',
+      'Title',
+      'Positions',
+      'Club Role',
+      'Team Role'
+    ]);
 
-    // Prioritize MainImageLink field
-    const mainImageLink = record.get('MainImageLink') as string;
+    const bio = this.extractStringField(record, [
+      'Bio',
+      'bio',
+      'Biography',
+      'About',
+      'About Me',
+      'Description'
+    ]);
 
-    if (mainImageLink) {
-      // Create a proxy URL using the MainImageLink URL
-      imageUrl = ImageService.getProxyUrl(mainImageLink);
-    }
-    // Fallback to other URL fields if MainImageLink is not available
-    else {
-      const directUrl = record.get('imageUrl') as string ||
-        record.get('Image URL') as string ||
-        record.get('Image') as string ||
-        record.get('image') as string ||
-        '';
+    const authorSub = this.normalizeLinkedRecordField(
+      record.get('AuthorSub') || record.get('authorSub') || record.get('Author Sub')
+    );
 
-      if (directUrl) {
-        // Proxy the direct URL as well
-        imageUrl = ImageService.getProxyUrl(directUrl);
-      }
-    }
-
-
-    // Handle role field which can be an array or string
-    const roleField = record.get('role') || record.get('Role');
-    const role = Array.isArray(roleField) ? roleField.join(', ') : (roleField as string || '');
-
-    // Handle authorSub and photoSub fields - these are arrays of article IDs
-    const authorSubField = record.get('AuthorSub') || record.get('authorSub') || record.get('Author Sub');
-    const authorSub = Array.isArray(authorSubField) ? authorSubField : (authorSubField ? [authorSubField] : undefined);
-
-    const photoSubField = record.get('PhotoSub') || record.get('photoSub') || record.get('Photo Sub');
-    const photoSub = Array.isArray(photoSubField) ? photoSubField : (photoSubField ? [photoSubField] : undefined);
+    const photoSub = this.normalizeLinkedRecordField(
+      record.get('PhotoSub') || record.get('photoSub') || record.get('Photo Sub')
+    );
 
     const memberPhotoFallbacks: Record<string, string> = {
       recZtkL9mFlnEVuka: '/member-photos/Adrianna%20Egan.jpg',
@@ -549,15 +575,138 @@ export class AirtableStorage implements IStorage {
 
     return {
       id: record.id,
-      name: record.get('name') as string || record.get('Name') as string || '',
-      role: role,
-      bio: record.get('bio') as string || record.get('Bio') as string || '',
-      imageUrl: imageUrl,
-      imageType: 'url', // Always use URL type since we're proxying
-      imagePath: null, // No need for local path when using proxy
-      authorSub: authorSub,
-      photoSub: photoSub
+      name,
+      role,
+      bio,
+      imageUrl,
+      imageType: 'url',
+      imagePath: null,
+      authorSub,
+      photoSub
     };
+  }
+
+  private getTeamTableCandidates(): string[] {
+    return Array.from(new Set(this.teamTableCandidates));
+  }
+
+  private isPermissionError(error: any): boolean {
+    return error?.statusCode === 403;
+  }
+
+  private isMissingTableError(error: any): boolean {
+    if (!error) return false;
+    if (error.statusCode === 404) {
+      const message = String(error.message || '').toLowerCase();
+      return message.includes('could not find table') || message.includes('table') || message === '';
+    }
+    return false;
+  }
+
+  private isRecordNotFoundError(error: any): boolean {
+    return error?.statusCode === 404 || error?.error === 'NOT_FOUND';
+  }
+
+  private extractStringField(record: Airtable.Record<any>, fieldNames: string[]): string {
+    for (const fieldName of fieldNames) {
+      const value = record.get(fieldName);
+      if (value === undefined || value === null) {
+        continue;
+      }
+
+      if (Array.isArray(value)) {
+        const strings = value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+        if (strings.length > 0) {
+          return strings.join(', ');
+        }
+      } else if (typeof value === 'string') {
+        if (value.trim().length > 0) {
+          return value;
+        }
+      } else if (typeof value === 'number') {
+        return value.toString();
+      }
+    }
+
+    return '';
+  }
+
+  private normalizeLinkedRecordField(value: any): string[] | undefined {
+    if (!value) {
+      return undefined;
+    }
+
+    if (Array.isArray(value)) {
+      const items = value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+      return items.length > 0 ? items : undefined;
+    }
+
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return [value];
+    }
+
+    return undefined;
+  }
+
+  private extractTeamImageUrl(record: Airtable.Record<any>): string {
+    const imageFieldCandidates = [
+      'MainImageLink',
+      'Main Image Link',
+      'MainImage',
+      'Image',
+      'image',
+      'Image URL',
+      'imageUrl',
+      'Photo',
+      'Headshot',
+      'Profile Photo',
+      'Profile Picture',
+      'Picture',
+      'Portrait',
+      'Avatar'
+    ];
+
+    for (const fieldName of imageFieldCandidates) {
+      const value = record.get(fieldName);
+      const resolvedUrl = this.resolveImageField(value);
+      if (resolvedUrl) {
+        return ImageService.getProxyUrl(resolvedUrl);
+      }
+    }
+
+    return '';
+  }
+
+  private resolveImageField(fieldValue: any): string | null {
+    if (!fieldValue) {
+      return null;
+    }
+
+    if (typeof fieldValue === 'string') {
+      return fieldValue;
+    }
+
+    if (Array.isArray(fieldValue)) {
+      for (const entry of fieldValue) {
+        if (!entry) {
+          continue;
+        }
+
+        if (typeof entry === 'string' && entry.trim().length > 0) {
+          return entry;
+        }
+
+        if (typeof entry === 'object' && 'url' in entry && typeof entry.url === 'string' && entry.url.trim().length > 0) {
+          return entry.url;
+        }
+      }
+    }
+
+    if (typeof fieldValue === 'object' && 'url' in fieldValue && typeof fieldValue.url === 'string' && fieldValue.url.trim().length > 0) {
+      return fieldValue.url;
+    }
+
+    return null;
   }
 }
 
